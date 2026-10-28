@@ -157,7 +157,7 @@ td.grp{font-weight:700;color:var(--syrup)}
     <div id="questions"></div>
     <div class="chance">
       <div class="meter" id="meter" aria-hidden="true"></div>
-      <p id="chanceText">チャンスアップ <b>0</b> / 3</p>
+      <p id="chanceText">チャンスアップ <b>0</b> / 4</p>
     </div>
     <button class="draw" id="drawBtn">くじを引く！</button>
     <div class="today" id="today"></div>
@@ -193,6 +193,7 @@ td.grp{font-weight:700;color:var(--syrup)}
       <section class="panel">
         <h2>アンケート回答による確率アップ</h2>
         <p class="note">回答した選択肢の値を、当選ラインから引きます。数字が大きいほど当たりやすくなります（例：高校生 A賞 0.10 → ライン 0.95 が 0.85 に）。未回答の項目は引きません。</p>
+        <p class="note">ショート動画を見ている人（「ほとんど視聴しない」以外）は、B賞から 1.00 を引く設定にしてあります。Bラインが0になるので、ハズレがなくなり必ずB賞以上が当たります。</p>
         <div class="scroll"><table>
           <thead><tr><th>項目</th><th>選択肢</th><th>A賞から引く</th><th>B賞から引く</th></tr></thead>
           <tbody id="bonusBody"></tbody>
@@ -230,7 +231,7 @@ td.grp{font-weight:700;color:var(--syrup)}
           <p class="note">USBメモリやGoogleドライブ・OneDriveの同期フォルダを選ぶと、そのままバックアップになります。ファイル名は crofflekuji_log.csv です。ChromeまたはEdgeで使えます。</p>
         </div>
         <div class="scroll"><table>
-          <thead><tr><th>No</th><th>時刻</th><th>性別</th><th>年代</th><th>来場区分</th><th>乱数</th><th>Aライン</th><th>Bライン</th><th>結果</th></tr></thead>
+          <thead><tr><th>No</th><th>時刻</th><th>性別</th><th>年代</th><th>来場区分</th><th>ショート動画</th><th>乱数</th><th>Aライン</th><th>Bライン</th><th>結果</th></tr></thead>
           <tbody id="logBody"></tbody>
         </table></div>
       </section>
@@ -280,14 +281,17 @@ td.grp{font-weight:700;color:var(--syrup)}
   const QUESTIONS = [
     {key:"gender", label:"性別", options:["男性","女性","その他"]},
     {key:"age", label:"年代", options:["10歳未満","10代","20代","30代","40代","50代","60代","70代以上"]},
-    {key:"party", label:"来場区分", options:["武蔵大学生","他大学生","武蔵大学生保護者","高校生","高校生保護者","その他・一般"]}
+    {key:"party", label:"来場区分", options:["武蔵大学生","他大学生","武蔵大学生保護者","高校生","高校生保護者","その他・一般"]},
+    {key:"short", label:"ショート動画の視聴習慣", options:["毎日見る","週に4〜5日程度","週に1〜2日程度","月に数回程度","ほとんど視聴しない"]}
   ];
   const DEFAULTS = {
     baseA:0.95, baseB:0.80, pin:"1234", sound:{on:true,vol:0.8},
     bonus:{
       gender:{"男性":[0.01,0.03],"女性":[0.01,0.03],"その他":[0.01,0.03]},
       age:{"10歳未満":[0.01,0.03],"10代":[0.01,0.03],"20代":[0.01,0.03],"30代":[0.01,0.03],"40代":[0.01,0.03],"50代":[0.01,0.03],"60代":[0.01,0.03],"70代以上":[0.01,0.03]},
-      party:{"武蔵大学生":[0.01,0.03],"他大学生":[0.01,0.03],"武蔵大学生保護者":[0.01,0.03],"高校生":[0.01,0.03],"高校生保護者":[0.01,0.03],"その他・一般":[0.01,0.03]}
+      party:{"武蔵大学生":[0.01,0.03],"他大学生":[0.01,0.03],"武蔵大学生保護者":[0.01,0.03],"高校生":[0.01,0.03],"高校生保護者":[0.01,0.03],"その他・一般":[0.01,0.03]},
+      // ショート動画を見ている人は B賞から 1.00 を引く → Bラインが0になり、必ずB賞以上
+      short:{"毎日見る":[0.01,1],"週に4〜5日程度":[0.01,1],"週に1〜2日程度":[0.01,1],"月に数回程度":[0.01,1],"ほとんど視聴しない":[0.01,0.03]}
     }
   };
   const PRIZE = {
@@ -378,7 +382,7 @@ td.grp{font-weight:700;color:var(--syrup)}
   }
 
   // ---------- くじ画面 ----------
-  const answers={gender:"",age:"",party:""};
+  const answers={};QUESTIONS.forEach(q=>answers[q.key]="");
   const $=id=>document.getElementById(id);
   function buildQuestions(){
     $("questions").innerHTML="";
@@ -400,7 +404,7 @@ td.grp{font-weight:700;color:var(--syrup)}
     document.querySelectorAll(".chip").forEach(b=>b.setAttribute("aria-pressed",String(answers[b.dataset.q]===b.dataset.o)));
     const n=QUESTIONS.filter(q=>answers[q.key]).length;
     $("meter").innerHTML=QUESTIONS.map((q,i)=>`<i class="${i<n?"on":""}">${i<n?"★":""}</i>`).join("");
-    $("chanceText").innerHTML=`チャンスアップ <b>${n}</b> / 3`;
+    $("chanceText").innerHTML=`チャンスアップ <b>${n}</b> / ${QUESTIONS.length}`;
   }
   function renderToday(){
     const d=new Date().toDateString();
@@ -415,7 +419,7 @@ td.grp{font-weight:700;color:var(--syrup)}
     const L=lines(ans), r=rand();
     const res=r>=L.a?"A":(r>=L.b?"B":"N");
     const rec={no:(LOG.length?LOG[LOG.length-1].no:0)+1,time:new Date().toISOString(),
-      gender:ans.gender,age:ans.age,party:ans.party,answered:QUESTIONS.filter(q=>ans[q.key]).length,
+      gender:ans.gender,age:ans.age,party:ans.party,short:ans.short,answered:QUESTIONS.filter(q=>ans[q.key]).length,
       rand:round(r),lineA:L.a,lineB:L.b,probA:L.pA,probB:L.pB,baseA:S.baseA,baseB:S.baseB,result:res};
     LOG.push(rec);
     if(!store(LKEY,LOG))toast("ログを保存できませんでした。CSVを保存してください");
@@ -452,7 +456,7 @@ td.grp{font-weight:700;color:var(--syrup)}
   }
   function closeOverlay(){
     $("overlay").hidden=true;$("sprinkles").innerHTML="";
-    answers.gender=answers.age=answers.party="";renderChips();renderToday();busy=false;
+    QUESTIONS.forEach(q=>answers[q.key]="");renderChips();renderToday();busy=false;
   }
 
   // ---------- タブ ----------
@@ -514,7 +518,7 @@ td.grp{font-weight:700;color:var(--syrup)}
     }));
   }
 
-  const sim={gender:"",age:"",party:""};
+  const sim={};QUESTIONS.forEach(q=>sim[q.key]="");
   function renderSimSels(){
     const box=$("simSels");box.innerHTML="";
     QUESTIONS.forEach(q=>{
@@ -535,8 +539,8 @@ td.grp{font-weight:700;color:var(--syrup)}
     const ans=LOG.filter(r=>r.answered>0).length;
     $("stats").innerHTML=`<span class="stat">抽選<b>${LOG.length}</b></span><span class="stat">A賞<b>${c.A}</b></span><span class="stat">B賞<b>${c.B}</b></span><span class="stat">ハズレ<b>${c.N}</b></span><span class="stat">アンケート回答あり<b>${ans}</b></span>`;
     const rows=LOG.slice(-15).reverse();
-    $("logBody").innerHTML=rows.length?rows.map(r=>`<tr><td>${r.no}</td><td>${new Date(r.time).toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}</td><td>${r.gender||"-"}</td><td>${r.age||"-"}</td><td>${r.party||"-"}</td><td>${r.rand.toFixed(4)}</td><td>${r.lineA.toFixed(2)}</td><td>${r.lineB.toFixed(2)}</td><td>${PRIZE[r.result].tag}</td></tr>`).join("")
-      :`<tr><td colspan="9" style="color:var(--cocoa-dim)">まだ抽選はありません。くじ引き画面で1回引くとここに表示されます。</td></tr>`;
+    $("logBody").innerHTML=rows.length?rows.map(r=>`<tr><td>${r.no}</td><td>${new Date(r.time).toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}</td><td>${r.gender||"-"}</td><td>${r.age||"-"}</td><td>${r.party||"-"}</td><td>${r.short||"-"}</td><td>${r.rand.toFixed(4)}</td><td>${r.lineA.toFixed(2)}</td><td>${r.lineB.toFixed(2)}</td><td>${PRIZE[r.result].tag}</td></tr>`).join("")
+      :`<tr><td colspan="10" style="color:var(--cocoa-dim)">まだ抽選はありません。くじ引き画面で1回引くとここに表示されます。</td></tr>`;
   }
   function renderSound(){$("soundOn").checked=S.sound.on;$("soundVol").value=S.sound.vol}
   $("soundOn").addEventListener("change",e=>{S.sound.on=e.target.checked;saveSettings()});
@@ -551,12 +555,12 @@ td.grp{font-weight:700;color:var(--syrup)}
 
   // CSV
   function toCSV(){
-    const head=["No","日時","性別","年代","来場区分","回答数","乱数","A賞ライン","B賞ライン","A賞確率","B賞確率","基本A賞ライン","基本B賞ライン","結果"];
+    const head=["No","日時","性別","年代","来場区分","ショート動画","回答数","乱数","A賞ライン","B賞ライン","A賞確率","B賞確率","基本A賞ライン","基本B賞ライン","結果"];
     const esc=v=>{v=String(v??"");return /[",\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v};
     const rows=LOG.map(r=>{
       const d=new Date(r.time),p=n=>String(n).padStart(2,"0");
       const ts=`${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-      return [r.no,ts,r.gender||"未回答",r.age||"未回答",r.party||"未回答",r.answered,r.rand,r.lineA,r.lineB,r.probA,r.probB,r.baseA,r.baseB,PRIZE[r.result].label].map(esc).join(",");
+      return [r.no,ts,r.gender||"未回答",r.age||"未回答",r.party||"未回答",r.short||"未回答",r.answered,r.rand,r.lineA,r.lineB,r.probA,r.probB,r.baseA,r.baseB,PRIZE[r.result].label].map(esc).join(",");
     });
     return "﻿"+[head.join(",")].concat(rows).join("\r\n");
   }
